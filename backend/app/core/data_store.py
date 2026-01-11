@@ -18,12 +18,42 @@ class DataStore:
             cls._instance = super().__new__(cls)
             cls._instance._storage = {}
             cls._instance._storage_dir.mkdir(parents=True, exist_ok=True)
+            # 起動時にディスクから既存ファイルを復元
+            cls._instance._load_from_disk()
         return cls._instance
     
     def __init__(self):
         if not hasattr(self, '_storage'):
             self._storage: Dict[str, dict] = {}
             self._storage_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _load_from_disk(self):
+        """起動時にディスクから既存のファイルを読み込む"""
+        if not self._storage_dir.exists():
+            return
+        
+        now = datetime.now()
+        for file_path in self._storage_dir.glob("*.pkl"):
+            try:
+                with open(file_path, 'rb') as f:
+                    item = pickle.load(f)
+                
+                # 有効期限チェック
+                if now <= item["expires_at"]:
+                    file_id = file_path.stem  # ファイル名（拡張子なし）をIDとして使用
+                    self._storage[file_id] = item
+                    print(f"✓ 復元: {file_id} (expires: {item['expires_at']})")
+                else:
+                    # 期限切れファイルは削除
+                    file_path.unlink()
+                    print(f"✗ 期限切れで削除: {file_path.name}")
+            except Exception as e:
+                print(f"✗ ファイル読み込みエラー: {file_path.name} - {e}")
+                # 壊れたファイルは削除
+                try:
+                    file_path.unlink()
+                except:
+                    pass
     
     @classmethod
     def get_instance(cls) -> 'DataStore':
@@ -36,12 +66,12 @@ class DataStore:
             cls._instance = cls()
         return cls._instance
     
-    def save(self, df: pd.DataFrame, retention_minutes: int = 60) -> str:
+    def save(self, df: pd.DataFrame, retention_minutes: int = 1440) -> str:
         """データを保存し、IDを返す
         
         Args:
             df: 保存するDataFrame
-            retention_minutes: 保持時間（分）
+            retention_minutes: 保持時間（分）デフォルト24時間
             
         Returns:
             ファイルID
