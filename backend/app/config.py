@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
-    CORS_ORIGINS: str = "http://localhost:5173"  # カンマ区切りの文字列として扱う
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174"  # カンマ区切りの文字列として扱う
     MAX_UPLOAD_SIZE: int = 52428800  # 50MB
     UPLOAD_DIR: str = "./tmp/uploads"
     DATA_RETENTION_MINUTES: int = 60

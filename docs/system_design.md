@@ -337,9 +337,14 @@ interface ChartsContainerProps {
 | GET | /api/data/stats | データ統計情報取得 |
 | POST | /api/backtest/execute | バックテスト実行 |
 | POST | /api/backtest/batch | 複数戦略一括実行 |
+| **POST** | **/api/backtest/grid-search** | **グリッドサーチ (Phase 7新規)** |
+| **POST** | **/api/backtest/compare** | **戦略比較 (Phase 7新規)** |
 | GET | /api/backtest/strategies | 利用可能な戦略一覧 |
-| POST | /api/analysis/compare | 戦略比較分析 |
 | GET | /api/analysis/export | 結果エクスポート |
+
+**Phase 7で追加されたエンドポイント**:
+- `/api/backtest/grid-search`: パラメータ範囲を指定してバックテスト最適化を実行
+- `/api/backtest/compare`: 複数戦略を並列実行して比較結果を取得
 
 詳細は `api_design.md` を参照。
 

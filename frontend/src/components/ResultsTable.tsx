@@ -1,3 +1,6 @@
+import { useState, useMemo } from 'react';
+import Papa from 'papaparse';
+
 interface BetResultDetail {
   raceId: string;
   競馬場: string;
@@ -20,30 +23,179 @@ interface ResultsTableProps {
   details: BetResultDetail[];
 }
 
+type SortKey = keyof BetResultDetail | null;
+type SortDirection = 'asc' | 'desc';
+
 export default function ResultsTable({ details }: ResultsTableProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const itemsPerPage = 50;
+
+  // ソート処理
+  const sortedDetails = useMemo(() => {
+    if (!sortKey) return details;
+
+    return [...details].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+
+      if (aVal == null || bVal == null) return 0;
+
+      let comparison = 0;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        comparison = aVal - bVal;
+      } else if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
+        comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
+      } else {
+        comparison = String(aVal).localeCompare(String(bVal));
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [details, sortKey, sortDirection]);
+
+  // ページネーション処理
+  const totalPages = Math.ceil(sortedDetails.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentDetails = sortedDetails.slice(startIndex, endIndex);
+
+  // ソートハンドラー
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  // CSVエクスポート
+  const exportToCSV = () => {
+    const csv = Papa.unparse(sortedDetails.map(d => ({
+      競馬場: d.競馬場,
+      開催年: d.開催年,
+      開催日: d.開催日,
+      レース番号: d.レース番号,
+      芝ダ区分: d.芝ダ区分,
+      距離: d.距離,
+      馬番: d.馬番,
+      購入タイプ: d.購入タイプ,
+      オッズ: d.オッズ,
+      購入金額: d.購入金額,
+      実際の着順: d.実際の着順,
+      的中: d.的中 ? '的中' : '不的中',
+      払戻金額: d.払戻金額,
+      利益: d.利益,
+    })));
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `backtest_results_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+  };
+
+  // ソートアイコン
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return <span className="text-gray-400 ml-1">⇅</span>;
+    return sortDirection === 'asc' ? <span className="ml-1">↑</span> : <span className="ml-1">↓</span>;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6 mb-6">
-      <h3 className="text-xl font-semibold mb-4">📋 レース別詳細結果</h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-semibold">📋 レース別詳細結果</h3>
+        <button
+          onClick={exportToCSV}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+        >
+          <span>📥</span>
+          CSV出力
+        </button>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">競馬場</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日付</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">R</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">芝/ダ</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">距離</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">馬番</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">購入</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">オッズ</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">着順</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">的中</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">払戻</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">損益</th>
+              <th 
+                onClick={() => handleSort('競馬場')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                競馬場<SortIcon columnKey="競馬場" />
+              </th>
+              <th 
+                onClick={() => handleSort('開催年')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                日付<SortIcon columnKey="開催年" />
+              </th>
+              <th 
+                onClick={() => handleSort('レース番号')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                R<SortIcon columnKey="レース番号" />
+              </th>
+              <th 
+                onClick={() => handleSort('芝ダ区分')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                芝/ダ<SortIcon columnKey="芝ダ区分" />
+              </th>
+              <th 
+                onClick={() => handleSort('距離')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                距離<SortIcon columnKey="距離" />
+              </th>
+              <th 
+                onClick={() => handleSort('馬番')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                馬番<SortIcon columnKey="馬番" />
+              </th>
+              <th 
+                onClick={() => handleSort('購入タイプ')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                購入<SortIcon columnKey="購入タイプ" />
+              </th>
+              <th 
+                onClick={() => handleSort('オッズ')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                オッズ<SortIcon columnKey="オッズ" />
+              </th>
+              <th 
+                onClick={() => handleSort('実際の着順')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                着順<SortIcon columnKey="実際の着順" />
+              </th>
+              <th 
+                onClick={() => handleSort('的中')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                的中<SortIcon columnKey="的中" />
+              </th>
+              <th 
+                onClick={() => handleSort('払戻金額')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                払戻<SortIcon columnKey="払戻金額" />
+              </th>
+              <th 
+                onClick={() => handleSort('利益')}
+                className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+              >
+                損益<SortIcon columnKey="利益" />
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {details.map((detail, index) => (
+            {currentDetails.map((detail, index) => (
               <tr key={index} className={detail.的中 ? 'bg-green-50' : ''}>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{detail.競馬場}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{detail.開催年}/{detail.開催日}</td>
@@ -74,6 +226,48 @@ export default function ResultsTable({ details }: ResultsTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* ページネーションコントロール */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-4">
+          <div className="text-sm text-gray-700">
+            {startIndex + 1}〜{Math.min(endIndex, sortedDetails.length)}件 / 全{sortedDetails.length}件
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              ≪
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              ＜
+            </button>
+            <span className="px-4 py-1 text-sm">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              ＞
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              ≫
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

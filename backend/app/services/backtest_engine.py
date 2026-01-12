@@ -5,6 +5,7 @@ import pandas as pd
 
 from app.services.strategies.base import BaseStrategy, BetResult
 from app.utils.calculations import calculate_roi, calculate_hit_rate
+from app.schemas.backtest import RaceFilter
 
 
 @dataclass
@@ -46,16 +47,21 @@ class BacktestEngine:
         self.strategy = strategy
         self.race_results: List[RaceResult] = []
     
-    def run(self, df: pd.DataFrame) -> BacktestSummary:
+    def run(self, df: pd.DataFrame, filters: Optional[RaceFilter] = None) -> BacktestSummary:
         """バックテストを実行
         
         Args:
             df: 全データのDataFrame
+            filters: レースフィルタ設定 (オプション)
             
         Returns:
             バックテスト結果サマリ
         """
         self.race_results = []
+        
+        # フィルタを適用
+        if filters:
+            df = self._apply_filters(df, filters)
         
         # レースごとにグループ化
         race_groups = df.groupby(['競馬場', '開催年', '開催日', 'レース番号'])
@@ -169,6 +175,48 @@ class BacktestEngine:
             win_count=win_count,
             place_count=place_count
         )
+    
+    def _apply_filters(self, df: pd.DataFrame, filters: RaceFilter) -> pd.DataFrame:
+        """レースフィルタを適用
+        
+        Args:
+            df: 全データのDataFrame
+            filters: レースフィルタ設定
+            
+        Returns:
+            フィルタ適用後のDataFrame
+        """
+        filtered_df = df.copy()
+        
+        # 競馬場フィルタ
+        if filters.racecourses and len(filters.racecourses) > 0:
+            filtered_df = filtered_df[filtered_df['競馬場'].isin(filters.racecourses)]
+        
+        # 馬場タイプフィルタ
+        if filters.surfaces and len(filters.surfaces) > 0:
+            filtered_df = filtered_df[filtered_df['芝ダ区分'].isin(filters.surfaces)]
+        
+        # 距離範囲フィルタ
+        if filters.distanceMin is not None:
+            filtered_df = filtered_df[filtered_df['距離'] >= filters.distanceMin]
+        if filters.distanceMax is not None:
+            filtered_df = filtered_df[filtered_df['距離'] <= filters.distanceMax]
+        
+        # 日付範囲フィルタ
+        if filters.dateFrom is not None:
+            date_from = int(filters.dateFrom)
+            filtered_df = filtered_df[filtered_df['開催日'] >= date_from]
+        if filters.dateTo is not None:
+            date_to = int(filters.dateTo)
+            filtered_df = filtered_df[filtered_df['開催日'] <= date_to]
+        
+        # オッズ範囲フィルタ (単勝オッズで判定)
+        if filters.oddsMin is not None:
+            filtered_df = filtered_df[filtered_df['単勝オッズ'] >= filters.oddsMin]
+        if filters.oddsMax is not None:
+            filtered_df = filtered_df[filtered_df['単勝オッズ'] <= filters.oddsMax]
+        
+        return filtered_df
     
     def get_results_dataframe(self) -> pd.DataFrame:
         """レース結果をDataFrameとして取得

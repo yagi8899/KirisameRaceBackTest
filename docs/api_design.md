@@ -416,7 +416,171 @@ GET /api/data/preview?fileId=uuid-v4-string&limit=10
 
 ---
 
-### 2.5 複数戦略一括実行 API
+### 2.5 グリッドサーチ API
+
+#### POST /api/backtest/grid-search
+
+パラメータの複数の組み合わせを自動的に試し、最適なパラメータを探索する。
+
+**Request**
+- **Content-Type**: `application/json`
+- **Body**:
+  ```typescript
+  {
+    dataFile: string;           // ファイルID
+    strategy: {
+      strategyType: "WIN" | "PLACE" | "BRACKET" | "WIDE" | "EXACTA" | "TRIO";
+      betAmountRange: number[]; // 例: [100, 200, 500]
+      topNRange: number[];      // 例: [1, 2, 3]
+      scoreThresholdRange: number[]; // 例: [0.0, 0.3, 0.5]
+      pivotHorse?: number;      // 軸馬（オプション）
+      minOdds?: number;
+      maxOdds?: number;
+      filters?: {
+        racecourses?: string[];
+        surfaces?: string[];
+        distanceMin?: number;
+        distanceMax?: number;
+        dateFrom?: string;
+        dateTo?: string;
+        oddsMin?: number;
+        oddsMax?: number;
+      };
+    };
+  }
+  ```
+
+**Response (200 OK)**
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "betAmount": 500,
+        "topN": 2,
+        "scoreThreshold": 0.3,
+        "totalRaces": 72,
+        "totalBets": 144,
+        "hits": 52,
+        "hitRate": 36.11,
+        "totalInvestment": 72000,
+        "totalReturn": 89450,
+        "totalProfit": 17450,
+        "roi": 124.24,
+        "averageOdds": 3.45,
+        "maxDrawdown": 0
+      }
+      // ... 最大10件（ROI降順）
+    ],
+    "bestParameters": {
+      "betAmount": 500,
+      "topN": 2,
+      "scoreThreshold": 0.3,
+      "roi": 124.24
+    },
+    "totalCombinations": 27
+  },
+  "message": "Grid search completed. 27 combinations tested."
+}
+```
+
+---
+
+### 2.6 戦略比較 API
+
+#### POST /api/backtest/compare
+
+複数の戦略を同時に実行し、結果を比較する。
+
+**Request**
+- **Content-Type**: `application/json`
+- **Body**:
+  ```typescript
+  {
+    dataFile: string;  // ファイルID
+    strategies: [
+      {
+        strategyType: "WIN" | "PLACE" | "BRACKET" | "WIDE" | "EXACTA" | "TRIO";
+        strategyName?: string;    // 戦略の名前（比較用）
+        betAmount: number;        // 100-10000
+        topN: number;            // 1-10
+        scoreThreshold: number;  // 0.0-1.0
+        pivotHorse?: number;     // 1-18（オプション）
+        minOdds?: number;
+        maxOdds?: number;
+        filters?: {
+          racecourses?: string[];
+          surfaces?: string[];
+          distanceMin?: number;
+          distanceMax?: number;
+          dateFrom?: string;
+          dateTo?: string;
+          oddsMin?: number;
+          oddsMax?: number;
+        };
+      }
+      // ... 複数の戦略
+    ];
+  }
+  ```
+
+**Response (200 OK)**
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "strategyName": "単勝戦略A",
+        "totalRaces": 72,
+        "totalBets": 72,
+        "hits": 24,
+        "hitRate": 33.33,
+        "totalInvestment": 7200,
+        "totalReturn": 8350,
+        "totalProfit": 1150,
+        "roi": 115.97,
+        "averageOdds": 3.48,
+        "maxDrawdown": 0
+      },
+      {
+        "strategyName": "単勝戦略B",
+        "totalRaces": 72,
+        "totalBets": 144,
+        "hits": 52,
+        "hitRate": 36.11,
+        "totalInvestment": 14400,
+        "totalReturn": 17895,
+        "totalProfit": 3495,
+        "roi": 124.27,
+        "averageOdds": 3.44,
+        "maxDrawdown": 0
+      }
+    ],
+    "bestStrategy": {
+      "strategyName": "単勝戦略B",
+      "totalRaces": 72,
+      "totalBets": 144,
+      "hits": 52,
+      "hitRate": 36.11,
+      "totalInvestment": 14400,
+      "totalReturn": 17895,
+      "totalProfit": 3495,
+      "roi": 124.27,
+      "averageOdds": 3.44,
+      "maxDrawdown": 0
+    }
+  },
+  "message": "2つの戦略を比較しました"
+}
+```
+
+---
+
+### 2.7 複数戦略一括実行 API (旧版・非推奨)
+
+**Note**: この API は古いバージョンです。新しい実装では `/api/backtest/compare` を使用してください。
 
 #### POST /api/backtest/batch
 
@@ -517,7 +681,7 @@ GET /api/data/preview?fileId=uuid-v4-string&limit=10
 
 ---
 
-### 2.6 利用可能な戦略一覧 API
+### 2.8 利用可能な戦略一覧 API
 
 #### GET /api/backtest/strategies
 
@@ -592,7 +756,9 @@ GET /api/data/preview?fileId=uuid-v4-string&limit=10
 
 ---
 
-### 2.7 戦略比較分析 API
+### 2.10 戦略比較分析 API (旧版・非推奨)
+
+**Note**: この API は古いバージョンです。新しい実装では `/api/backtest/compare` を使用してください。
 
 #### POST /api/analysis/compare
 
@@ -649,7 +815,7 @@ GET /api/data/preview?fileId=uuid-v4-string&limit=10
 
 ---
 
-### 2.8 結果エクスポート API
+### 2.9 結果エクスポート API
 
 #### GET /api/analysis/export
 

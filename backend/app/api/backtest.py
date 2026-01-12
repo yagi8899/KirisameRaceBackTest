@@ -1,6 +1,8 @@
 """バックテストAPI"""
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
+from typing import List
+import itertools
 
 from app.schemas.common import ApiResponse, ErrorResponse, ErrorDetail
 from app.schemas.backtest import (
@@ -10,6 +12,16 @@ from app.schemas.backtest import (
     BetResultDetail,
     StrategyConfig,
     RaceProfitData,
+)
+from app.schemas.grid_search import (
+    GridSearchRequest,
+    GridSearchResponse,
+    GridSearchResultItem,
+)
+from app.schemas.strategy_comparison import (
+    ComparisonRequest,
+    ComparisonResponse,
+    ComparisonResultItem,
 )
 from app.models.enums import StrategyType
 from app.core.data_store import DataStore
@@ -105,9 +117,10 @@ async def run_backtest(request: BacktestRequest):
         # 戦略作成
         strategy = create_strategy(request.strategy)
         
-        # バックテスト実行
+        # バックテスト実行 (フィルタを適用)
         engine = BacktestEngine(strategy)
-        summary = engine.run(df)
+        filters = request.strategy.filters if hasattr(request.strategy, 'filters') else None
+        summary = engine.run(df, filters=filters)
         
         # 詳細結果取得
         results_df = engine.get_results_dataframe()
@@ -187,3 +200,206 @@ async def run_backtest(request: BacktestRequest):
             status_code=500,
             content=error_response.model_dump()
         )
+
+
+@router.post("/grid-search", response_model=ApiResponse)
+async def run_grid_search(request: GridSearchRequest):
+    """
+    グリッドサーチを実行
+    
+    複数のパラメータ組み合わせで自動的にバックテストを実行し、
+    最適なパラメータを発見します。
+    
+    Args:
+        request: グリッドサーチリクエスト
+        
+    Returns:
+        グリッドサーチ結果 (ROI降順)
+    """
+    # データ取得
+    data_store = DataStore.get_instance()
+    df = data_store.get(request.fileId)
+    
+    if df is None:
+        error_response = ErrorResponse(
+            error=ErrorDetail(
+                code="FILE_NOT_FOUND",
+                message="指定されたファイルIDが見つかりません",
+                details={"file_id": request.fileId}
+            )
+        )
+        return JSONResponse(
+            status_code=404,
+            content=error_response.model_dump()
+        )
+    
+    try:
+        # パラメータ範囲からすべての組み合わせを生成
+        bet_amounts = request.paramRanges.betAmounts or [100]
+        top_n_values = request.paramRanges.topNValues or [1]
+        score_thresholds = request.paramRanges.scoreThresholds or [0.0]
+        
+        combinations = list(itertools.product(bet_amounts, top_n_values, score_thresholds))
+        total_combinations = len(combinations)
+        
+        results: List[GridSearchResultItem] = []
+        
+        # 各組み合わせでバックテストを実行
+        for bet_amount, top_n, score_threshold in combinations:
+            # 戦略設定を作成
+            strategy_config = StrategyConfig(
+                strategyType=request.strategyType,
+                betAmount=bet_amount,
+                topN=top_n,
+                scoreThreshold=score_threshold,
+                minOdds=1.0,
+                maxOdds=100.0,
+                filters=request.filters,
+            )
+            
+            # 戦略作成
+            strategy = create_strategy(strategy_config)
+            
+            # バックテスト実行
+            engine = BacktestEngine(strategy)
+            summary = engine.run(df, filters=request.filters)
+            
+            # 結果を追加
+            result_item = GridSearchResultItem(
+                betAmount=bet_amount,
+                topN=top_n,
+                scoreThreshold=score_threshold,
+                totalRaces=summary.total_races,
+                betRaces=summary.bet_races,
+                totalBets=summary.total_bets,
+                totalInvestment=summary.total_investment,
+                totalPayout=summary.total_payout,
+                totalProfit=summary.total_profit,
+                roi=summary.roi,
+                hitRate=summary.hit_rate,
+                hitCount=summary.hit_count,
+            )
+            results.append(result_item)
+        
+        # ROI降順でソート
+        results.sort(key=lambda x: x.roi, reverse=True)
+        
+        # 最良の結果を取得
+        best_result = results[0] if results else None
+        
+        if not best_result:
+            raise ValueError("グリッドサーチの結果が得られませんでした")
+        
+        # レスポンス作成
+        grid_search_response = GridSearchResponse(
+            totalCombinations=total_combinations,
+            results=results,
+            bestResult=best_result,
+            strategyType=request.strategyType,
+        )
+        
+        return ApiResponse(
+            success=True,
+            data=grid_search_response.model_dump(),
+            message=f"グリッドサーチが完了しました ({total_combinations}通りの組み合わせを検証)"
+        )
+        
+    except Exception as e:
+        error_response = ErrorResponse(
+            error=ErrorDetail(
+                code="GRID_SEARCH_ERROR",
+                message=f"グリッドサーチ実行中にエラーが発生しました: {str(e)}",
+                details={"error": str(e)}
+            )
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_response.model_dump()
+        )
+
+
+@router.post("/compare", response_model=ApiResponse)
+async def compare_strategies(request: ComparisonRequest):
+    """複数の戦略を同時にバックテストして比較する
+    
+    Args:
+        request: 比較リクエスト（複数の戦略設定を含む）
+        
+    Returns:
+        各戦略の結果と最良の戦略
+    """
+    try:
+        data_store = DataStore.get_instance()
+        
+        # データファイルの読み込み
+        data = data_store.get(request.dataFile)
+        
+        if data is None or data.empty:
+            raise ValueError(f"データファイル {request.dataFile} が見つからないか空です")
+        
+        # 各戦略でバックテストを実行
+        comparison_results: List[ComparisonResultItem] = []
+        
+        for strategy_config in request.strategies:
+            # 戦略インスタンスを作成
+            strategy = create_strategy(strategy_config)
+            
+            # バックテストエンジンを初期化
+            engine = BacktestEngine(strategy=strategy)
+            
+            # バックテストを実行 (フィルタも渡す)
+            summary = engine.run(
+                df=data,
+                filters=strategy_config.filters,
+            )
+            
+            # 結果をまとめる
+            comparison_item = ComparisonResultItem(
+                strategyName=strategy_config.strategyName or strategy_config.strategyType.value,
+                totalRaces=summary.total_races,
+                totalBets=summary.total_bets,
+                hits=summary.hit_count,
+                hitRate=summary.hit_rate,
+                totalInvestment=int(summary.total_investment),
+                totalReturn=int(summary.total_payout),
+                totalProfit=int(summary.total_profit),
+                roi=summary.roi,
+                averageOdds=summary.average_odds,
+                maxDrawdown=0,  # TODO: maxDrawdown計算機能を実装する
+            )
+            print(f"[DEBUG] ComparisonResultItem created")
+            comparison_results.append(comparison_item)
+        
+        # ROIでソート（降順）
+        comparison_results.sort(key=lambda x: x.roi, reverse=True)
+        の戦略を取得
+        best_strategy = comparison_results[0] if comparison_results else None
+        
+        if not best_strategy:
+            raise ValueError("比較結果が得られませんでした")
+        
+        # レスポンス作成
+        comparison_response = ComparisonResponse(
+            results=comparison_results,
+            bestStrategy=best_strategy,
+        )
+        
+        return ApiResponse(
+            success=True,
+            data=comparison_response.model_dump(),
+            message=f"{len(request.strategies)}つの戦略を比較しました"
+        )
+        
+    except Exception as e:
+        error_response = ErrorResponse(
+            error=ErrorDetail(
+                code="COMPARISON_ERROR",
+                message=f"戦略比較中にエラーが発生しました: {str(e)}",
+                details={"error": str(e)}
+            )
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_response.model_dump()
+        )
+

@@ -1,4 +1,4 @@
-import { Upload, TrendingUp, Users, Target, Calendar } from 'lucide-react';
+import { TrendingUp, Users, Target, Calendar } from 'lucide-react';
 
 interface DataStats {
   totalRaces: number;

@@ -1,6 +1,7 @@
 """データストア（ディスク永続化対応）"""
 import uuid
 import pickle
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Optional
@@ -159,6 +160,7 @@ class DataStore:
             deleted = True
         
         # ディスクからも削除
+        now = time.time()
         
         # メモリ内の期限切れを削除
         expired_ids = [

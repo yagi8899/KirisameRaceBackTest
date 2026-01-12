@@ -151,15 +151,15 @@ export default function ResultsSummary({ summary, strategyType }: ResultsSummary
                 stat.highlight ? "ring-2 ring-offset-2" : "",
                 stat.highlight && isProfit ? "ring-green-500" : "",
                 stat.highlight && !isProfit ? "ring-red-500" : "",
-                colorClasses.bg,
+                colorClasses?.bg || '',
                 "hover:shadow-md"
               )}
             >
-              <div className={cn("inline-flex p-2 rounded-lg mb-2", colorClasses.iconBg)}>
-                <Icon className={cn("w-4 h-4", colorClasses.text)} />
+              <div className={cn("inline-flex p-2 rounded-lg mb-2", colorClasses?.iconBg || '')}>
+                <Icon className={cn("w-4 h-4", colorClasses?.text || '')} />
               </div>
               <div className="text-xs text-gray-600 mb-1">{stat.label}</div>
-              <div className={cn("text-xl font-bold", colorClasses.text)}>{stat.value}</div>
+              <div className={cn("text-xl font-bold", colorClasses?.text || '')}>{stat.value}</div>
             </div>
           );
         })}

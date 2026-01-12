@@ -4,12 +4,31 @@ from typing import List, Dict, Optional
 from app.models.enums import StrategyType
 
 
+class RaceFilter(BaseModel):
+    """レースフィルタ設定"""
+    racecourses: Optional[List[str]] = Field(default=None, description="競馬場リスト")
+    surfaces: Optional[List[str]] = Field(default=None, description="馬場タイプ (芝/ダート)")
+    distanceMin: Optional[int] = Field(default=None, ge=1000, le=3600, description="最小距離")
+    distanceMax: Optional[int] = Field(default=None, ge=1000, le=3600, description="最大距離")
+    dateFrom: Optional[str] = Field(default=None, description="開始日 (YYYYMMDD)")
+    dateTo: Optional[str] = Field(default=None, description="終了日 (YYYYMMDD)")
+    oddsMin: Optional[float] = Field(default=None, ge=1.0, description="最小オッズ")
+    oddsMax: Optional[float] = Field(default=None, le=1000.0, description="最大オッズ")
+
+
 class StrategyConfig(BaseModel):
     """戦略設定"""
     strategyType: StrategyType
-    betAmount: int = Field(default=100, ge=1, description="1レースあたりの購入金額")
-    minOdds: Optional[float] = Field(default=1.0, ge=0.1, description="最小オッズ")
-    maxOdds: Optional[float] = Field(default=100.0, le=1000.0, description="最大オッズ")
+    strategyName: Optional[str] = Field(default=None, description="戦略の名前 (比較用)")
+    betAmount: int = Field(default=100, ge=1, le=100000, description="1レースあたりの購入金額")
+    betAmountMin: Optional[int] = Field(default=None, ge=1, le=100000, description="最小購入金額 (グリッドサーチ用)")
+    betAmountMax: Optional[int] = Field(default=None, ge=1, le=100000, description="最大購入金額 (グリッドサーチ用)")
+    topN: int = Field(default=1, ge=1, le=10, description="上位N頭まで購入")
+    scoreThreshold: float = Field(default=0.0, ge=0.0, le=1.0, description="予測スコア閾値")
+    pivotHorse: Optional[int] = Field(default=None, ge=1, le=18, description="軸馬の馬番 (馬単・3連複用)")
+    minOdds: Optional[float] = Field(default=1.0, ge=0.1, description="最小オッズ (非推奨: filtersを使用)")
+    maxOdds: Optional[float] = Field(default=100.0, le=1000.0, description="最大オッズ (非推奨: filtersを使用)")
+    filters: Optional[RaceFilter] = Field(default=None, description="レースフィルタ")
 
 
 class BacktestRequest(BaseModel):
