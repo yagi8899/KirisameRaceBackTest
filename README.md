@@ -27,6 +27,7 @@
 | ドキュメント | 対象者 | 内容 |
 |----------|--------|------|
 | [ユーザーガイド](docs/USER_GUIDE.md) | **一般ユーザー** | システムの目的・機能・使い方・FAQ |
+| [ベストプラクティス](docs/BEST_PRACTICES.md) | **⭐ 実践ユーザー** | 最良の使い方・推奨設定・成功事例 |
 | [システム概要](docs/SYSTEM_OVERVIEW.md) | **技術者** | アーキテクチャ・データフロー・API仕様 |
 | [要件仕様](docs/requirements.md) | **開発者** | 機能要件・非機能要件・制約条件 |
 | [API設計](docs/api_design.md) | **API開発者** | エンドポイント詳細・リクエスト/レスポンス仕様 |
@@ -37,8 +38,9 @@
 
 **📖 最初に読むべきドキュメント**:
 1. 一般ユーザー → [ユーザーガイド](docs/USER_GUIDE.md)
-2. 技術者 → [システム概要](docs/SYSTEM_OVERVIEW.md)
-3. 開発者 → [API設計](docs/api_design.md) + [フロントエンド設計](docs/frontend_design.md)
+2. ⭐ **実際に利益を出したい** → [ベストプラクティス](docs/BEST_PRACTICES.md)
+3. 技術者 → [システム概要](docs/SYSTEM_OVERVIEW.md)
+4. 開発者 → [API設計](docs/api_design.md) + [フロントエンド設計](docs/frontend_design.md)
 
 ---
 
