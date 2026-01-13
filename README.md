@@ -89,7 +89,23 @@ npm install
 
 ### 実行
 
-#### ターミナル1: バックエンド起動
+#### 方法1: バッチファイルで起動（Windows - 推奨）
+
+**すべて同時起動**:
+```bash
+start_all.bat
+```
+→ バックエンドとフロントエンドが別ウィンドウで起動
+
+**個別起動**:
+```bash
+start_backend.bat  # バックエンドのみ
+start_frontend.bat # フロントエンドのみ
+```
+
+#### 方法2: ターミナルで起動（手動）
+
+**ターミナル1: バックエンド起動**
 
 ```bash
 cd backend
@@ -103,7 +119,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Application startup complete
 ```
 
-#### ターミナル2: フロントエンド起動
+**ターミナル2: フロントエンド起動**
 
 ```bash
 cd frontend
@@ -118,7 +134,7 @@ npm run dev
   ➜  press h to show help
 ```
 
-#### 3. ブラウザで開く
+#### ブラウザで開く
 
 ```
 http://localhost:5174
