@@ -6,7 +6,7 @@ interface HitRateChartProps {
   details: any[];
 }
 
-type ViewMode = 'venue' | 'distance' | 'surface';
+type ViewMode = 'venue' | 'distance' | 'surface' | 'year';
 
 export function HitRateChart({ details }: HitRateChartProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('venue');
@@ -81,6 +81,29 @@ export function HitRateChart({ details }: HitRateChartProps) {
     })).sort((a, b) => b.hitRate - a.hitRate);
   };
 
+  // 年度別的中率
+  const getYearData = () => {
+    const yearStats: Record<string, { total: number; hits: number }> = {};
+    
+    details.forEach((detail) => {
+      const year = detail.開催年;
+      if (!yearStats[year]) {
+        yearStats[year] = { total: 0, hits: 0 };
+      }
+      yearStats[year].total++;
+      if (detail.的中) yearStats[year].hits++;
+    });
+
+    return Object.entries(yearStats)
+      .map(([year, stats]) => ({
+        name: `${year}年`,
+        hitRate: (stats.hits / stats.total) * 100,
+        hits: stats.hits,
+        total: stats.total,
+      }))
+      .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  };
+
   const getData = () => {
     switch (viewMode) {
       case 'venue':
@@ -89,6 +112,8 @@ export function HitRateChart({ details }: HitRateChartProps) {
         return getDistanceData();
       case 'surface':
         return getSurfaceData();
+      case 'year':
+        return getYearData();
       default:
         return [];
     }
@@ -135,6 +160,16 @@ export function HitRateChart({ details }: HitRateChartProps) {
             }`}
           >
             馬場別
+          </button>
+          <button
+            onClick={() => setViewMode('year')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              viewMode === 'year'
+                ? 'bg-orange-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            年度別
           </button>
         </div>
       </div>

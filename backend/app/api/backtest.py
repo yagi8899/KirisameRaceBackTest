@@ -48,36 +48,42 @@ def create_strategy(strategy_config: StrategyConfig):
     if strategy_config.strategyType == StrategyType.WIN:
         return WinStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 100.0,
         )
     elif strategy_config.strategyType == StrategyType.PLACE:
         return PlaceStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 100.0,
         )
     elif strategy_config.strategyType == StrategyType.BRACKET:
         return UmarenStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 1000.0,
         )
     elif strategy_config.strategyType == StrategyType.WIDE:
         return WideStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 100.0,
         )
     elif strategy_config.strategyType == StrategyType.EXACTA:
         return UmatanStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 10000.0,
         )
     elif strategy_config.strategyType == StrategyType.TRIO:
         return TrioStrategy(
             bet_amount=strategy_config.betAmount,
+            top_n=strategy_config.topN,
             min_odds=strategy_config.minOdds or 1.0,
             max_odds=strategy_config.maxOdds or 10000.0,
         )

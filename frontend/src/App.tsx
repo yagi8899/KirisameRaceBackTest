@@ -361,10 +361,22 @@ function App() {
             </Card>
             
             {/* グラフエリア - 2カラムグリッド */}
-            {backtestResult.profitData && backtestResult.profitData.length > 0 && (
+            {backtestResult.details && backtestResult.details.length > 0 && (
               <div className="grid md:grid-cols-2 gap-6">
                 <Card title="収支推移" icon="📈" className="animate-scaleIn">
-                  <ProfitChart data={backtestResult.profitData} />
+                  <ProfitChart data={backtestResult.details.map((detail, index) => {
+                    const cumulativeProfit = backtestResult.details
+                      .slice(0, index + 1)
+                      .reduce((sum, d) => sum + d.利益, 0);
+                    return {
+                      raceNumber: index + 1,
+                      cumulativeProfit,
+                      開催年: detail.開催年,
+                      開催日: detail.開催日,
+                      競馬場: detail.競馬場,
+                      レース番号: detail.レース番号,
+                    };
+                  })} />
                 </Card>
                 
                 <Card title="ROI推移" icon="📊" className="animate-scaleIn">

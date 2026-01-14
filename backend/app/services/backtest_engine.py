@@ -156,7 +156,8 @@ class BacktestEngine:
         hit_rate = calculate_hit_rate(hit_count, total_bets)
         roi = calculate_roi(total_profit, total_investment)
         
-        average_odds = sum(br.bet_decision.odds for br in all_bet_results) / total_bets if total_bets > 0 else 0
+        # 平均オッズは実際に使用されたオッズを使用
+        average_odds = sum(br.actual_odds if br.actual_odds else br.bet_decision.odds for br in all_bet_results) / total_bets if total_bets > 0 else 0
         
         win_count = sum(1 for br in all_bet_results if br.actual_rank == 1)
         place_count = sum(1 for br in all_bet_results if br.actual_rank <= 3)
@@ -237,7 +238,7 @@ class BacktestEngine:
                     "芝ダ区分": race_result.race_info["芝ダ区分"],
                     "馬番": bet_result.bet_decision.horse_number,
                     "購入タイプ": bet_result.bet_decision.bet_type,
-                    "オッズ": bet_result.bet_decision.odds,
+                    "オッズ": bet_result.actual_odds if bet_result.actual_odds else bet_result.bet_decision.odds,
                     "購入金額": bet_result.bet_decision.bet_amount,
                     "実際の着順": bet_result.actual_rank,
                     "的中": bet_result.is_hit,

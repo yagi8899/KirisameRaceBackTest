@@ -32,6 +32,14 @@ export default function ResultsTable({ details }: ResultsTableProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const itemsPerPage = 50;
 
+  // 開催年と開催日をyyyy/MM/dd形式に変換
+  const formatRaceDate = (year: number, day: number): string => {
+    const dayStr = String(day).padStart(3, '0');
+    const month = dayStr.substring(0, dayStr.length - 2);
+    const date = dayStr.substring(dayStr.length - 2);
+    return `${year}/${month.padStart(2, '0')}/${date}`;
+  };
+
   // ソート処理
   const sortedDetails = useMemo(() => {
     if (!sortKey) return details;
@@ -130,7 +138,7 @@ export default function ResultsTable({ details }: ResultsTableProps) {
                 onClick={() => handleSort('開催年')}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
-                日付<SortIcon columnKey="開催年" />
+                開催日時<SortIcon columnKey="開催年" />
               </th>
               <th 
                 onClick={() => handleSort('レース番号')}
@@ -198,7 +206,7 @@ export default function ResultsTable({ details }: ResultsTableProps) {
             {currentDetails.map((detail, index) => (
               <tr key={index} className={detail.的中 ? 'bg-green-50' : ''}>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{detail.競馬場}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{detail.開催年}/{detail.開催日}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{formatRaceDate(detail.開催年, detail.開催日)}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{detail.レース番号}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{detail.芝ダ区分}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{detail.距離}m</td>

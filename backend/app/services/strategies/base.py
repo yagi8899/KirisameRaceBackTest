@@ -27,6 +27,7 @@ class BetResult:
     payout: float  # 払戻金額
     profit: float  # 利益（払戻 - 購入金額）
     actual_rank: int  # 実際の着順
+    actual_odds: Optional[float] = None  # 実際に使用したオッズ
 
 
 class BaseStrategy(ABC):
@@ -96,12 +97,16 @@ class BaseStrategy(ABC):
         horse_data = race_data[race_data['馬番'] == bet_decision.horse_number]
         actual_rank = horse_data['確定着順'].iloc[0] if len(horse_data) > 0 else 99
         
+        # 実際に使用したオッズを計算（払戻/購入金額）
+        actual_odds = payout / bet_decision.bet_amount if payout > 0 else bet_decision.odds
+        
         return BetResult(
             bet_decision=bet_decision,
             is_hit=is_hit,
             payout=payout,
             profit=profit,
-            actual_rank=int(actual_rank)
+            actual_rank=int(actual_rank),
+            actual_odds=actual_odds
         )
     
     def get_race_id(self, race_data: pd.DataFrame) -> str:

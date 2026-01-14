@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 
@@ -5,7 +6,11 @@ interface OddsDistributionChartProps {
   details: any[];
 }
 
+type ViewMode = 'all' | 'year';
+
 export function OddsDistributionChart({ details }: OddsDistributionChartProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
+  
   // 的中したレースのオッズ分布を計算
   const hitDetails = details.filter(d => d.的中);
 
@@ -41,16 +46,72 @@ export function OddsDistributionChart({ details }: OddsDistributionChartProps) {
     return distribution;
   };
 
-  const chartData = getOddsDistribution();
+  // 年度別のオッズ分布を計算
+  const getYearlyOddsDistribution = () => {
+    const yearlyData: Record<string, any> = {};
+    
+    hitDetails.forEach((detail) => {
+      const year = detail.開催年;
+      if (!yearlyData[year]) {
+        yearlyData[year] = {
+          totalHits: 0,
+          totalPayout: 0,
+          avgOdds: 0,
+          oddsSum: 0,
+        };
+      }
+      yearlyData[year].totalHits++;
+      yearlyData[year].totalPayout += detail.払戻金額;
+      yearlyData[year].oddsSum += detail.オッズ;
+    });
+
+    return Object.entries(yearlyData)
+      .map(([year, data]) => ({
+        name: `${year}年`,
+        totalHits: data.totalHits,
+        totalPayout: data.totalPayout,
+        avgOdds: data.oddsSum / data.totalHits,
+      }))
+      .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  };
+
+  const chartData = viewMode === 'all' ? getOddsDistribution() : getYearlyOddsDistribution();
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
-      <div className="flex items-center gap-2 mb-6">
-        <TrendingUp className="w-5 h-5 text-red-600" />
-        <h3 className="text-lg font-bold text-gray-900">的中オッズ分布</h3>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-red-600" />
+          <h3 className="text-lg font-bold text-gray-900">的中オッズ分布</h3>
+        </div>
+        
+        {/* タブ切り替え */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('all')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              viewMode === 'all'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            オッズ帯別
+          </button>
+          <button
+            onClick={() => setViewMode('year')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              viewMode === 'year'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            年度別
+          </button>
+        </div>
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
+        {viewMode === 'all' ? (
         <ComposedChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
@@ -114,6 +175,68 @@ export function OddsDistributionChart({ details }: OddsDistributionChartProps) {
             name="総払戻額"
           />
         </ComposedChart>
+        ) : (
+        <ComposedChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis
+            dataKey="name"
+            label={{ value: '年度', position: 'insideBottom', offset: -5 }}
+            stroke="#6b7280"
+          />
+          {/* 左軸: 的中回数 */}
+          <YAxis
+            yAxisId="left"
+            label={{ value: '的中回数', angle: -90, position: 'insideLeft' }}
+            stroke="#ef4444"
+          />
+          {/* 右軸: 平均オッズ */}
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            label={{ value: '平均オッズ', angle: 90, position: 'insideRight' }}
+            stroke="#3b82f6"
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '8px 12px',
+            }}
+            formatter={(value, name) => {
+              if (name === 'totalHits' || name === '的中回数') {
+                return [`${value || 0}回`, '的中回数'];
+              }
+              if (name === 'avgOdds' || name === '平均オッズ') {
+                return [`${typeof value === 'number' ? value.toFixed(1) : 0}倍`, '平均オッズ'];
+              }
+              if (name === 'totalPayout' || name === '総払戻額') {
+                return [`${(value || 0).toLocaleString()}円`, '総払戻額'];
+              }
+              return [value, name];
+            }}
+          />
+          <Legend />
+          {/* 棒グラフ: 的中回数 (左軸) */}
+          <Bar
+            yAxisId="left"
+            dataKey="totalHits"
+            fill="#ef4444"
+            name="的中回数"
+            radius={[8, 8, 0, 0]}
+          />
+          {/* 折れ線グラフ: 平均オッズ (右軸) */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="avgOdds"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            dot={{ r: 4 }}
+            name="平均オッズ"
+          />
+        </ComposedChart>
+        )}
       </ResponsiveContainer>
 
       {/* 統計情報 */}

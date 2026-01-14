@@ -7,16 +7,18 @@ from app.services.strategies.base import BaseStrategy, BetDecision
 
 
 class UmarenStrategy(BaseStrategy):
-    """馬連戦略（予測上位2頭で馬連購入）"""
+    """馬連戦略（予測上位N頭の組み合わせで馬連購入）"""
     
-    def __init__(self, bet_amount: int = 100, min_odds: float = 1.0, max_odds: float = 1000.0):
+    def __init__(self, bet_amount: int = 100, top_n: int = 2, min_odds: float = 1.0, max_odds: float = 1000.0):
         """
         Args:
             bet_amount: 1レースあたりの購入金額
+            top_n: 購入対象とする上位N頭（組み合わせ数: C(N,2)）
             min_odds: 最小オッズ（これ以下は購入しない）
             max_odds: 最大オッズ（これ以上は購入しない）
         """
         super().__init__(StrategyType.BRACKET, bet_amount)
+        self.top_n = max(2, top_n)  # 最低2頭
         self.min_odds = min_odds
         self.max_odds = max_odds
     
@@ -57,31 +59,55 @@ class UmarenStrategy(BaseStrategy):
         if not self.should_bet(race_data):
             return []
         
-        # 予測1位と2位の馬を取得
-        pred_1st = race_data[race_data['予測順位'] == 1].iloc[0]
-        pred_2nd = race_data[race_data['予測順位'] == 2].iloc[0]
+        # 予測順位1～topNに重複や欠損がないかチェック
+        for rank in range(1, self.top_n + 1):
+            pred_horses = race_data[race_data['予測順位'] == rank]
+            if len(pred_horses) != 1:
+                # 該当順位が0頭または2頭以上の場合はスキップ
+                return []
         
-        horse1 = int(pred_1st['馬番'])
-        horse2 = int(pred_2nd['馬番'])
+        bet_decisions = []
         
-        # 馬連オッズを取得（ない場合は単勝オッズの積で推定）
-        umaren_odds = race_data['馬連オッズ'].iloc[0] if '馬連オッズ' in race_data.columns else None
-        if pd.isna(umaren_odds):
-            # 単勝オッズから推定（単勝1位×単勝2位の30%程度）
-            win_odds_1 = pred_1st['単勝オッズ']
-            win_odds_2 = pred_2nd['単勝オッズ']
-            umaren_odds = win_odds_1 * win_odds_2 * 0.3
+        # 予測上位N頭を取得
+        top_horses = []
+        for rank in range(1, self.top_n + 1):
+            pred_horse = race_data[race_data['予測順位'] == rank]
+            if len(pred_horse) > 0:
+                top_horses.append(pred_horse.iloc[0])
         
-        bet_decision = BetDecision(
-            race_id=self.get_race_id(race_data),
-            horse_number=horse1,  # 代表として1位の馬番を記録
-            bet_amount=self.bet_amount,
-            bet_type="馬連",
-            odds=float(umaren_odds),
-            additional_info={"horse1": horse1, "horse2": horse2}
-        )
+        # 上位N頭から全ての2頭の組み合わせ（C(N,2)通り）を生成
+        from itertools import combinations
         
-        return [bet_decision]
+        for i, j in combinations(range(len(top_horses)), 2):
+            horse1_row = top_horses[i]
+            horse2_row = top_horses[j]
+            
+            horse1 = int(horse1_row['馬番'])
+            horse2 = int(horse2_row['馬番'])
+            
+            # 馬連オッズを取得（ない場合は単勝オッズの積で推定）
+            umaren_odds = race_data['馬連オッズ'].iloc[0] if '馬連オッズ' in race_data.columns else None
+            if pd.isna(umaren_odds) or umaren_odds == 0:
+                # 単勝オッズから推定（単勝1位×単勝2位の30%程度）
+                win_odds_1 = horse1_row['単勝オッズ']
+                win_odds_2 = horse2_row['単勝オッズ']
+                umaren_odds = win_odds_1 * win_odds_2 * 0.3
+            
+            # オッズフィルタ
+            if not (self.min_odds <= umaren_odds <= self.max_odds):
+                continue
+            
+            bet_decision = BetDecision(
+                race_id=self.get_race_id(race_data),
+                horse_number=horse1,  # 代表として小さい方の馬番を記録
+                bet_amount=self.bet_amount,
+                bet_type="馬連",
+                odds=float(umaren_odds),
+                additional_info={"horse1": horse1, "horse2": horse2}
+            )
+            bet_decisions.append(bet_decision)
+        
+        return bet_decisions
     
     def calculate_payout(self, bet_decision: BetDecision, race_data: pd.DataFrame) -> float:
         """払戻金額を計算

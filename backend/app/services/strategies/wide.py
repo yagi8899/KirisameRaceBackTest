@@ -7,16 +7,18 @@ from app.services.strategies.base import BaseStrategy, BetDecision
 
 
 class WideStrategy(BaseStrategy):
-    """ワイド戦略（予測上位2頭でワイド購入）"""
+    """ワイド戦略（予測上位N頭の組み合わせでワイド購入）"""
     
-    def __init__(self, bet_amount: int = 100, min_odds: float = 1.0, max_odds: float = 100.0):
+    def __init__(self, bet_amount: int = 100, top_n: int = 2, min_odds: float = 1.0, max_odds: float = 100.0):
         """
         Args:
             bet_amount: 1レースあたりの購入金額
+            top_n: 購入対象とする上位N頭（組み合わせ数: C(N,2)）
             min_odds: 最小オッズ（これ以下は購入しない）
             max_odds: 最大オッズ（これ以上は購入しない）
         """
         super().__init__(StrategyType.WIDE, bet_amount)
+        self.top_n = max(2, top_n)  # 最低2頭
         self.min_odds = min_odds
         self.max_odds = max_odds
     
@@ -58,34 +60,58 @@ class WideStrategy(BaseStrategy):
         if not self.should_bet(race_data):
             return []
         
-        # 予測1位と2位の馬を取得
-        pred_1st = race_data[race_data['予測順位'] == 1].iloc[0]
-        pred_2nd = race_data[race_data['予測順位'] == 2].iloc[0]
+        # 予測順位1～topNに重複や欠損がないかチェック
+        for rank in range(1, self.top_n + 1):
+            pred_horses = race_data[race_data['予測順位'] == rank]
+            if len(pred_horses) != 1:
+                # 該当順位が0頭または2頭以上の場合はスキップ
+                return []
         
-        horse1 = int(pred_1st['馬番'])
-        horse2 = int(pred_2nd['馬番'])
+        bet_decisions = []
         
-        # ワイドオッズを取得（ない場合は単勝オッズから推定）
-        wide_odds = None
-        if 'ワイド1_2オッズ' in race_data.columns:
-            wide_odds = race_data['ワイド1_2オッズ'].iloc[0]
+        # 予測上位N頭を取得
+        top_horses = []
+        for rank in range(1, self.top_n + 1):
+            pred_horse = race_data[race_data['予測順位'] == rank]
+            if len(pred_horse) > 0:
+                top_horses.append(pred_horse.iloc[0])
         
-        if pd.isna(wide_odds):
-            # 単勝オッズから推定（複勝オッズの組み合わせ程度）
-            win_odds_1 = pred_1st['単勝オッズ']
-            win_odds_2 = pred_2nd['単勝オッズ']
-            wide_odds = (win_odds_1 * 0.4 + win_odds_2 * 0.4) / 2.0
+        # 上位N頭から全ての2頭の組み合わせ（C(N,2)通り）を生成
+        from itertools import combinations
         
-        bet_decision = BetDecision(
-            race_id=self.get_race_id(race_data),
-            horse_number=horse1,  # 代表として1位の馬番を記録
-            bet_amount=self.bet_amount,
-            bet_type="ワイド",
-            odds=float(wide_odds),
-            additional_info={"horse1": horse1, "horse2": horse2}
-        )
+        for i, j in combinations(range(len(top_horses)), 2):
+            horse1_row = top_horses[i]
+            horse2_row = top_horses[j]
+            
+            horse1 = int(horse1_row['馬番'])
+            horse2 = int(horse2_row['馬番'])
+            
+            # ワイドオッズを取得（ない場合は単勝オッズから推定）
+            wide_odds = None
+            if 'ワイド1_2オッズ' in race_data.columns:
+                wide_odds = race_data['ワイド1_2オッズ'].iloc[0]
+            
+            if pd.isna(wide_odds) or wide_odds == 0:
+                # 単勝オッズから推定（複勝オッズの組み合わせ程度）
+                win_odds_1 = horse1_row['単勝オッズ']
+                win_odds_2 = horse2_row['単勝オッズ']
+                wide_odds = (win_odds_1 * 0.4 + win_odds_2 * 0.4) / 2.0
+            
+            # オッズフィルタ
+            if not (self.min_odds <= wide_odds <= self.max_odds):
+                continue
+            
+            bet_decision = BetDecision(
+                race_id=self.get_race_id(race_data),
+                horse_number=horse1,  # 代表として小さい方の馬番を記録
+                bet_amount=self.bet_amount,
+                bet_type="ワイド",
+                odds=float(wide_odds),
+                additional_info={"horse1": horse1, "horse2": horse2}
+            )
+            bet_decisions.append(bet_decision)
         
-        return [bet_decision]
+        return bet_decisions
     
     def calculate_payout(self, bet_decision: BetDecision, race_data: pd.DataFrame) -> float:
         """払戻金額を計算
@@ -112,12 +138,20 @@ class WideStrategy(BaseStrategy):
         
         # 両方とも1-3着に入っていれば的中
         if rank1 <= 3 and rank2 <= 3:
-            # 実際のワイドオッズを使用（複数のワイドオッズから該当するものを探す）
-            # ワイド1_2オッズ、ワイド2_3オッズ、ワイド1_3オッズから該当するものを選択
-            actual_odds = None
+            # 的中した着順の組み合わせから正しいワイドオッズ列を選択
+            ranks = sorted([rank1, rank2])
+            odds_column = None
             
-            if 'ワイド1_2オッズ' in race_data.columns:
-                actual_odds = race_data['ワイド1_2オッズ'].iloc[0]
+            if ranks == [1, 2]:
+                odds_column = 'ワイド1_2オッズ'
+            elif ranks == [1, 3]:
+                odds_column = 'ワイド1_3オッズ'
+            elif ranks == [2, 3]:
+                odds_column = 'ワイド2_3オッズ'
+            
+            # 該当するワイドオッズ列が存在する場合は使用
+            if odds_column and odds_column in race_data.columns:
+                actual_odds = race_data[odds_column].iloc[0]
                 if not pd.isna(actual_odds):
                     return bet_decision.bet_amount * actual_odds
             
