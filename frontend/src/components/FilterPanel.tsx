@@ -87,7 +87,18 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
     setDateTo('');
     setOddsMin(1.0);
     setOddsMax(100.0);
-    handleChange();
+    
+    // stateは非同期で更新されるため、直接空のfiltersを送信
+    onFiltersChange({
+      racecourses: [],
+      surfaces: [],
+      distanceMin: null,
+      distanceMax: null,
+      dateFrom: null,
+      dateTo: null,
+      oddsMin: null,
+      oddsMax: null,
+    });
   };
 
   const activeFilterCount = 

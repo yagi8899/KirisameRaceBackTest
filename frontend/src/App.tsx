@@ -13,6 +13,7 @@ import ProfitChart from './components/ProfitChart';
 import { RoiChart } from './components/RoiChart';
 import { HitRateChart } from './components/HitRateChart';
 import { OddsDistributionChart } from './components/OddsDistributionChart';
+import { RoiAnalysisChart } from './components/RoiAnalysisChart';
 import ResultsTable from './components/ResultsTable';
 import ComparisonView from './components/ComparisonView';
 import { Card } from './components/common/Card';
@@ -409,6 +410,13 @@ function App() {
                 <div className="animate-scaleIn">
                   <OddsDistributionChart details={backtestResult.details} />
                 </div>
+              </div>
+            )}
+            
+            {/* 回収率（ROI）分析グラフ */}
+            {backtestResult.details && backtestResult.details.length > 0 && (
+              <div className="animate-scaleIn">
+                <RoiAnalysisChart details={backtestResult.details} />
               </div>
             )}
             

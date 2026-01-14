@@ -67,12 +67,26 @@ class DataStore:
             cls._instance = cls()
         return cls._instance
     
-    def save(self, df: pd.DataFrame, retention_minutes: int = 1440) -> str:
+    def clear_all(self):
+        """全てのデータを削除（ファイル新規アップロード時用）"""
+        # メモリをクリア
+        self._storage.clear()
+        
+        # ディスク上のファイルも削除
+        if self._storage_dir.exists():
+            for file_path in self._storage_dir.glob("*.pkl"):
+                try:
+                    file_path.unlink()
+                    print(f"✓ 削除: {file_path.name}")
+                except Exception as e:
+                    print(f"✗ 削除エラー: {file_path.name} - {e}")
+    
+    def save(self, df: pd.DataFrame, retention_minutes: int = 525600) -> str:
         """データを保存し、IDを返す
         
         Args:
             df: 保存するDataFrame
-            retention_minutes: 保持時間（分）デフォルト24時間
+            retention_minutes: 保持時間（分）デフォルト1年（実質無期限）
             
         Returns:
             ファイルID

@@ -61,7 +61,7 @@ class BacktestEngine:
         
         # フィルタを適用
         if filters:
-            df = self._apply_filters(df, filters)
+            df = self._apply_filters(df, filters, self.strategy)
         
         # レースごとにグループ化
         race_groups = df.groupby(['競馬場', '開催年', '開催日', 'レース番号'])
@@ -177,12 +177,13 @@ class BacktestEngine:
             place_count=place_count
         )
     
-    def _apply_filters(self, df: pd.DataFrame, filters: RaceFilter) -> pd.DataFrame:
+    def _apply_filters(self, df: pd.DataFrame, filters: RaceFilter, strategy: BaseStrategy) -> pd.DataFrame:
         """レースフィルタを適用
         
         Args:
             df: 全データのDataFrame
             filters: レースフィルタ設定
+            strategy: 使用する戦略（オッズカラム判定用）
             
         Returns:
             フィルタ適用後のDataFrame
@@ -211,13 +212,76 @@ class BacktestEngine:
             date_to = int(filters.dateTo)
             filtered_df = filtered_df[filtered_df['開催日'] <= date_to]
         
-        # オッズ範囲フィルタ (単勝オッズで判定)
-        if filters.oddsMin is not None:
-            filtered_df = filtered_df[filtered_df['単勝オッズ'] >= filters.oddsMin]
-        if filters.oddsMax is not None:
-            filtered_df = filtered_df[filtered_df['単勝オッズ'] <= filters.oddsMax]
+        # オッズ範囲フィルタ（戦略タイプに応じた適切なオッズカラムを使用）
+        if filters.oddsMin is not None or filters.oddsMax is not None:
+            filtered_df = self._apply_odds_filter(filtered_df, filters, strategy)
         
         return filtered_df
+    
+    def _apply_odds_filter(self, df: pd.DataFrame, filters: RaceFilter, strategy: BaseStrategy) -> pd.DataFrame:
+        """オッズフィルタを適用（複数オッズカラムに対応）
+        
+        Args:
+            df: DataFrame
+            filters: フィルタ設定
+            strategy: 戦略インスタンス
+            
+        Returns:
+            フィルタ適用後のDataFrame
+        """
+        strategy_type = type(strategy).__name__
+        
+        # 複勝：3つのオッズの最小値を使用（最も確率が高い）
+        if strategy_type == 'PlaceStrategy':
+            place_cols = ['複勝1着オッズ', '複勝2着オッズ', '複勝3着オッズ']
+            available_cols = [col for col in place_cols if col in df.columns]
+            if available_cols:
+                df['_filter_odds'] = df[available_cols].min(axis=1)
+        
+        # ワイド：3つのオッズの最小値を使用（最も確率が高い）
+        elif strategy_type == 'WideStrategy':
+            wide_cols = ['ワイド1_2オッズ', 'ワイド2_3オッズ', 'ワイド1_3オッズ']
+            available_cols = [col for col in wide_cols if col in df.columns]
+            if available_cols:
+                df['_filter_odds'] = df[available_cols].min(axis=1)
+        
+        # その他の戦略：単一オッズカラムを使用
+        else:
+            odds_column = self._get_odds_column_for_strategy(strategy)
+            if odds_column in df.columns:
+                df['_filter_odds'] = df[odds_column]
+        
+        # フィルタ適用
+        if '_filter_odds' in df.columns:
+            if filters.oddsMin is not None:
+                df = df[df['_filter_odds'] >= filters.oddsMin]
+            if filters.oddsMax is not None:
+                df = df[df['_filter_odds'] <= filters.oddsMax]
+            # 一時カラムを削除
+            df = df.drop(columns=['_filter_odds'])
+        
+        return df
+    
+    def _get_odds_column_for_strategy(self, strategy: BaseStrategy) -> str:
+        """戦略タイプに応じた適切なオッズカラム名を返す
+        
+        Args:
+            strategy: 戦略インスタンス
+            
+        Returns:
+            オッズカラム名
+        """
+        strategy_type = type(strategy).__name__
+        
+        # 戦略ごとに適切なオッズカラムをマッピング
+        odds_mapping = {
+            'WinStrategy': '単勝オッズ',
+            'UmarenStrategy': '馬連オッズ',
+            'UmatanStrategy': '馬単オッズ',
+            'TrioStrategy': '３連複オッズ',
+        }
+        
+        return odds_mapping.get(strategy_type, '単勝オッズ')  # デフォルトは単勝
     
     def get_results_dataframe(self) -> pd.DataFrame:
         """レース結果をDataFrameとして取得

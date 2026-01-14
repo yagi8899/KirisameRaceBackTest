@@ -96,8 +96,9 @@ async def upload_file(file: UploadFile = File(...)):
                 content=error_response.model_dump()
             )
         
-        # データストアに保存
+        # データストアに保存（新規アップロード時は既存データを削除）
         data_store = DataStore.get_instance()
+        data_store.clear_all()  # 古いデータを削除
         file_id = data_store.save(df)
         
         # 統計情報計算
