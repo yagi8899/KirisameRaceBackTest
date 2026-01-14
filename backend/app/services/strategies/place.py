@@ -9,18 +9,20 @@ from app.services.strategies.base import BaseStrategy, BetDecision
 class PlaceStrategy(BaseStrategy):
     """複勝戦略（予測上位N頭に複勝購入）"""
     
-    def __init__(self, bet_amount: int = 100, top_n: int = 1, min_odds: float = 1.0, max_odds: float = 100.0):
+    def __init__(self, bet_amount: int = 100, top_n: int = 1, min_odds: float = 1.0, max_odds: float = 100.0, score_threshold: float = 0.0):
         """
         Args:
             bet_amount: 1レースあたりの購入金額
             top_n: 購入対象とする上位N頭
             min_odds: 最小オッズ（これ以下は購入しない）
             max_odds: 最大オッズ（これ以上は購入しない）
+            score_threshold: 予測スコア閾値（これ以下は購入しない）
         """
         super().__init__(StrategyType.PLACE, bet_amount)
         self.top_n = top_n
         self.min_odds = min_odds
         self.max_odds = max_odds
+        self.score_threshold = score_threshold
     
     def should_bet(self, race_data: pd.DataFrame) -> bool:
         """購入すべきかを判定
@@ -74,6 +76,13 @@ class PlaceStrategy(BaseStrategy):
                 continue
             
             pred_horse = pred_horse.iloc[0]
+            
+            # 予測スコアチェック
+            if '予測スコア' in race_data.columns:
+                pred_score = pred_horse['予測スコア']
+                if pd.notna(pred_score) and pred_score < self.score_threshold:
+                    continue
+            
             win_odds = pred_horse['単勝オッズ']
             
             if pd.isna(win_odds):

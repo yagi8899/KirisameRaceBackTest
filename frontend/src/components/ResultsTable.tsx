@@ -26,10 +26,14 @@ interface ResultsTableProps {
 type SortKey = keyof BetResultDetail | null;
 type SortDirection = 'asc' | 'desc';
 
+interface SortConfig {
+  key: SortKey;
+  direction: SortDirection;
+}
+
 export default function ResultsTable({ details }: ResultsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortKey, setSortKey] = useState<SortKey>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
   const itemsPerPage = 50;
 
   // 開催年と開催日をyyyy/MM/dd形式に変換
@@ -40,28 +44,44 @@ export default function ResultsTable({ details }: ResultsTableProps) {
     return `${year}/${month.padStart(2, '0')}/${date}`;
   };
 
-  // ソート処理
+  // ソート処理（マルチソート対応）
   const sortedDetails = useMemo(() => {
-    if (!sortKey) return details;
+    if (sortConfigs.length === 0) return details;
 
     return [...details].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+      // 複数のソート条件を順番に適用
+      for (const config of sortConfigs) {
+        if (!config.key) continue;
 
-      if (aVal == null || bVal == null) return 0;
+        let aVal = a[config.key];
+        let bVal = b[config.key];
 
-      let comparison = 0;
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        comparison = aVal - bVal;
-      } else if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
-        comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
-      } else {
-        comparison = String(aVal).localeCompare(String(bVal));
+        // 開催年でソートする場合は、開催日も考慮した複合値を使用
+        if (config.key === '開催年') {
+          aVal = a['開催年'] * 10000 + a['開催日'];
+          bVal = b['開催年'] * 10000 + b['開催日'];
+        }
+
+        if (aVal == null && bVal == null) continue;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+
+        let comparison = 0;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          comparison = aVal - bVal;
+        } else if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
+          comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
+        } else {
+          comparison = String(aVal).localeCompare(String(bVal));
+        }
+
+        if (comparison !== 0) {
+          return config.direction === 'asc' ? comparison : -comparison;
+        }
       }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return 0;
     });
-  }, [details, sortKey, sortDirection]);
+  }, [details, sortConfigs]);
 
   // ページネーション処理
   const totalPages = Math.ceil(sortedDetails.length / itemsPerPage);
@@ -69,14 +89,45 @@ export default function ResultsTable({ details }: ResultsTableProps) {
   const endIndex = startIndex + itemsPerPage;
   const currentDetails = sortedDetails.slice(startIndex, endIndex);
 
-  // ソートハンドラー
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDirection('asc');
-    }
+  // ソートハンドラー（マルチソート対応）
+  const handleSort = (key: SortKey, event: React.MouseEvent) => {
+    if (!key) return;
+
+    const ctrlPressed = event.ctrlKey || event.metaKey; // Ctrl/Cmd押下で単一ソート
+
+    setSortConfigs(prevConfigs => {
+      const existingIndex = prevConfigs.findIndex(config => config.key === key);
+
+      if (ctrlPressed) {
+        // Ctrl/Cmd押下時：単一ソート（リセット）
+        if (existingIndex === 0 && prevConfigs.length === 1) {
+          // 既に単一ソート中の同じ列なら方向を反転
+          return [{ key, direction: prevConfigs[0].direction === 'asc' ? 'desc' : 'asc' }];
+        } else {
+          // 新しい単一ソート
+          return [{ key, direction: 'asc' }];
+        }
+      } else {
+        // 通常クリック：マルチソート（既存のソートに追加）
+        if (existingIndex >= 0) {
+          // 既存の条件がある場合：方向を反転
+          const newConfigs = [...prevConfigs];
+          newConfigs[existingIndex] = {
+            key,
+            direction: newConfigs[existingIndex].direction === 'asc' ? 'desc' : 'asc',
+          };
+          return newConfigs;
+        } else {
+          // 新しい条件を追加
+          return [...prevConfigs, { key, direction: 'asc' }];
+        }
+      }
+    });
+  };
+
+  // ソートクリア
+  const clearSort = () => {
+    setSortConfigs([]);
   };
 
   // CSVエクスポート
@@ -105,16 +156,49 @@ export default function ResultsTable({ details }: ResultsTableProps) {
     link.click();
   };
 
-  // ソートアイコン
+  // ソートアイコン（マルチソート対応）
   const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
-    if (sortKey !== columnKey) return <span className="text-gray-400 ml-1">⇅</span>;
-    return sortDirection === 'asc' ? <span className="ml-1">↑</span> : <span className="ml-1">↓</span>;
+    const configIndex = sortConfigs.findIndex(config => config.key === columnKey);
+    
+    if (configIndex === -1) {
+      return <span className="text-gray-400 ml-1">⇅</span>;
+    }
+
+    const config = sortConfigs[configIndex];
+    const arrow = config.direction === 'asc' ? '↑' : '↓';
+    const badge = sortConfigs.length > 1 ? `${configIndex + 1}` : '';
+
+    return (
+      <span className="ml-1 inline-flex items-center gap-0.5">
+        {arrow}
+        {badge && (
+          <span className="text-xs bg-orange-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+            {badge}
+          </span>
+        )}
+      </span>
+    );
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6 mb-6">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">📋 レース別詳細結果</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-semibold">📋 レース別詳細結果</h3>
+          {sortConfigs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {sortConfigs.length > 1 ? `${sortConfigs.length}列でソート中` : 'ソート中'}
+              </span>
+              <button
+                onClick={clearSort}
+                className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              >
+                クリア
+              </button>
+            </div>
+          )}
+        </div>
         <button
           onClick={exportToCSV}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -124,78 +208,83 @@ export default function ResultsTable({ details }: ResultsTableProps) {
         </button>
       </div>
 
+      {/* マルチソートのヒント */}
+      <div className="mb-3 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+        💡 <strong>ソート方法:</strong> 列ヘッダークリックで追加ソート（順序番号表示）。Ctrl/Cmd + クリックでその列のみソート
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th 
-                onClick={() => handleSort('競馬場')}
+                onClick={(e) => handleSort('競馬場', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 競馬場<SortIcon columnKey="競馬場" />
               </th>
               <th 
-                onClick={() => handleSort('開催年')}
+                onClick={(e) => handleSort('開催年', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 開催日時<SortIcon columnKey="開催年" />
               </th>
               <th 
-                onClick={() => handleSort('レース番号')}
+                onClick={(e) => handleSort('レース番号', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 R<SortIcon columnKey="レース番号" />
               </th>
               <th 
-                onClick={() => handleSort('芝ダ区分')}
+                onClick={(e) => handleSort('芝ダ区分', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 芝/ダ<SortIcon columnKey="芝ダ区分" />
               </th>
               <th 
-                onClick={() => handleSort('距離')}
+                onClick={(e) => handleSort('距離', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 距離<SortIcon columnKey="距離" />
               </th>
               <th 
-                onClick={() => handleSort('馬番')}
+                onClick={(e) => handleSort('馬番', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 馬番<SortIcon columnKey="馬番" />
               </th>
               <th 
-                onClick={() => handleSort('購入タイプ')}
+                onClick={(e) => handleSort('購入タイプ', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 購入<SortIcon columnKey="購入タイプ" />
               </th>
               <th 
-                onClick={() => handleSort('オッズ')}
+                onClick={(e) => handleSort('オッズ', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 オッズ<SortIcon columnKey="オッズ" />
               </th>
               <th 
-                onClick={() => handleSort('実際の着順')}
+                onClick={(e) => handleSort('実際の着順', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 着順<SortIcon columnKey="実際の着順" />
               </th>
               <th 
-                onClick={() => handleSort('的中')}
+                onClick={(e) => handleSort('的中', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 的中<SortIcon columnKey="的中" />
               </th>
               <th 
-                onClick={() => handleSort('払戻金額')}
+                onClick={(e) => handleSort('払戻金額', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 払戻<SortIcon columnKey="払戻金額" />
               </th>
               <th 
-                onClick={() => handleSort('利益')}
+                onClick={(e) => handleSort('利益', e)}
                 className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
               >
                 損益<SortIcon columnKey="利益" />

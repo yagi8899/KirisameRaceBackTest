@@ -9,6 +9,7 @@ import {
   BadgeCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useMemo } from 'react';
 
 interface BacktestSummary {
   totalRaces: number;
@@ -24,12 +25,21 @@ interface BacktestSummary {
   winCount: number;
 }
 
+interface BetResultDetail {
+  開催年: number;
+  購入金額: number;
+  払戻金額: number;
+  利益: number;
+  的中: boolean;
+}
+
 interface ResultsSummaryProps {
   summary: BacktestSummary;
   strategyType: string;
+  details?: BetResultDetail[];
 }
 
-export default function ResultsSummary({ summary, strategyType }: ResultsSummaryProps) {
+export default function ResultsSummary({ summary, strategyType, details }: ResultsSummaryProps) {
   const strategyNames: Record<string, string> = {
     WIN: '単勝',
     PLACE: '複勝',
@@ -47,6 +57,41 @@ export default function ResultsSummary({ summary, strategyType }: ResultsSummary
     EXACTA: { from: 'from-orange-500', to: 'to-orange-600', text: 'text-orange-600', bg: 'bg-orange-50' },
     TRIO: { from: 'from-pink-500', to: 'to-pink-600', text: 'text-pink-600', bg: 'bg-pink-50' },
   };
+
+  // 年度別統計を計算
+  const yearlyStats = useMemo(() => {
+    if (!details || details.length === 0) return [];
+
+    const yearMap = new Map<number, {
+      bets: number;
+      investment: number;
+      payout: number;
+      profit: number;
+      hits: number;
+    }>();
+
+    details.forEach(detail => {
+      const year = detail.開催年;
+      const existing = yearMap.get(year) || { bets: 0, investment: 0, payout: 0, profit: 0, hits: 0 };
+      
+      yearMap.set(year, {
+        bets: existing.bets + 1,
+        investment: existing.investment + detail.購入金額,
+        payout: existing.payout + detail.払戻金額,
+        profit: existing.profit + detail.利益,
+        hits: existing.hits + (detail.的中 ? 1 : 0),
+      });
+    });
+
+    return Array.from(yearMap.entries())
+      .map(([year, stats]) => ({
+        year,
+        ...stats,
+        roi: (stats.profit / stats.investment) * 100,
+        hitRate: (stats.hits / stats.bets) * 100,
+      }))
+      .sort((a, b) => a.year - b.year);
+  }, [details]);
 
   const colors = strategyColors[strategyType] || strategyColors.WIN;
   const isProfit = summary.totalProfit >= 0;
@@ -182,6 +227,81 @@ export default function ResultsSummary({ summary, strategyType }: ResultsSummary
           );
         })}
       </div>
+
+      {/* 年度別統計テーブル */}
+      {yearlyStats.length > 1 && (
+        <div className="pt-6 border-t border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 年度別統計</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    年度
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    購入数
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    投資額
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    払戻額
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    利益
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ROI
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    的中率
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    的中数
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {yearlyStats.map((stat) => (
+                  <tr key={stat.year} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {stat.year}年
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-600">
+                      {stat.bets}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-600">
+                      ¥{stat.investment.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-600">
+                      ¥{stat.payout.toLocaleString()}
+                    </td>
+                    <td className={cn(
+                      "px-4 py-3 whitespace-nowrap text-sm text-right font-semibold",
+                      stat.profit >= 0 ? "text-green-600" : "text-red-600"
+                    )}>
+                      {stat.profit >= 0 ? '+' : ''}¥{stat.profit.toLocaleString()}
+                    </td>
+                    <td className={cn(
+                      "px-4 py-3 whitespace-nowrap text-sm text-right font-semibold",
+                      stat.roi >= 100 ? "text-green-600" : "text-red-600"
+                    )}>
+                      {stat.roi.toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-purple-600 font-semibold">
+                      {stat.hitRate.toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-600">
+                      {stat.hits}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

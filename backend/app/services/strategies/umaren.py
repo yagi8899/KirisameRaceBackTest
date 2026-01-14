@@ -9,18 +9,20 @@ from app.services.strategies.base import BaseStrategy, BetDecision
 class UmarenStrategy(BaseStrategy):
     """馬連戦略（予測上位N頭の組み合わせで馬連購入）"""
     
-    def __init__(self, bet_amount: int = 100, top_n: int = 2, min_odds: float = 1.0, max_odds: float = 1000.0):
+    def __init__(self, bet_amount: int = 100, top_n: int = 2, min_odds: float = 1.0, max_odds: float = 1000.0, score_threshold: float = 0.0):
         """
         Args:
             bet_amount: 1レースあたりの購入金額
             top_n: 購入対象とする上位N頭（組み合わせ数: C(N,2)）
             min_odds: 最小オッズ（これ以下は購入しない）
             max_odds: 最大オッズ（これ以上は購入しない）
+            score_threshold: 予測スコア閾値（これ以下は購入しない）
         """
         super().__init__(StrategyType.BRACKET, bet_amount)
         self.top_n = max(2, top_n)  # 最低2頭
         self.min_odds = min_odds
         self.max_odds = max_odds
+        self.score_threshold = score_threshold
     
     def should_bet(self, race_data: pd.DataFrame) -> bool:
         """購入すべきかを判定
@@ -81,6 +83,15 @@ class UmarenStrategy(BaseStrategy):
         for i, j in combinations(range(len(top_horses)), 2):
             horse1_row = top_horses[i]
             horse2_row = top_horses[j]
+            
+            # 予測スコアチェック
+            if '予測スコア' in race_data.columns:
+                pred_score1 = horse1_row['予測スコア']
+                pred_score2 = horse2_row['予測スコア']
+                if pd.notna(pred_score1) and pred_score1 < self.score_threshold:
+                    continue
+                if pd.notna(pred_score2) and pred_score2 < self.score_threshold:
+                    continue
             
             horse1 = int(horse1_row['馬番'])
             horse2 = int(horse2_row['馬番'])

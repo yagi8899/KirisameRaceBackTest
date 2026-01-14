@@ -1,6 +1,6 @@
 # Kirisame Race BackTest
 
-[![Phase 10](https://img.shields.io/badge/Phase-10-brightgreen)](docs/development_roadmap.md)
+[![Phase 11](https://img.shields.io/badge/Phase-11-brightgreen)](docs/development_roadmap.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue)](https://www.python.org/)
 [![Node.js 16+](https://img.shields.io/badge/Node.js-16+-blue)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -15,9 +15,12 @@
 
 - ✅ **複数賭式対応**: 単勝・複勝・馬連・ワイド・馬単・三連複の6種類に対応
 - 📊 **高度な分析**: ROI、的中率、利益推移、オッズ分布などを可視化
+- � **年度別分析**: 収支推移・的中率・オッズ分布を年度別に表示・比較
 - 🔍 **グリッドサーチ**: 投資パラメータの最適組合せを自動探索
 - 🔄 **戦略比較**: 複数の投資戦略を並べて比較検証
 - 🎛️ **柔軟なフィルタ**: 競馬場・馬場・距離・オッズ条件で細かく絞り込み
+- 🎯 **予測スコア閾値**: 予測スコアによる購入条件の設定が可能
+- 📋 **マルチソート**: レース別詳細結果で複数列の同時ソートが可能
 - ⚡ **高速処理**: 1000+レースのバックテストを数秒で完了
 
 ---
@@ -369,6 +372,15 @@ MIT License - [LICENSE](LICENSE) を参照
 
 ## 📅 更新履歴
 
+### Phase 11 (2026-01-14)
+- ✅ 馬連・ワイド戦略のtopN対応とバグ修正
+- ✅ 年度別分析機能追加（的中率分析、オッズ分布）
+- ✅ 収支推移グラフの年度別表示機能
+- ✅ バックテスト結果サマリーに年度別統計テーブル追加
+- ✅ レース別詳細結果にマルチソート機能追加
+- ✅ 予測スコア閾値機能の全戦略対応
+- ✅ 開催日時ソートの改善（年月日を複合値でソート）
+
 ### Phase 10 (2026-01-13)
 - ✅ モダンUI実装（カード型レイアウト + 2カラムグリッド）
 - ✅ Accordionコンポーネント追加
@@ -390,6 +402,6 @@ MIT License - [LICENSE](LICENSE) を参照
 
 ---
 
-**バージョン**: Phase 10  
-**最終更新**: 2026年1月13日  
-**ステータス**: ✅ 完成
+**バージョン**: Phase 11  
+**最終更新**: 2026年1月14日  
+**ステータス**: ✅ 完成・機能強化中

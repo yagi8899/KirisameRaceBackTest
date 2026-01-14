@@ -357,6 +357,7 @@ function App() {
               <ResultsSummary
                 summary={backtestResult.summary}
                 strategyType={backtestResult.strategy.strategyType}
+                details={backtestResult.details}
               />
             </Card>
             

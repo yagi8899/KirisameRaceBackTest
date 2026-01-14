@@ -9,18 +9,20 @@ from app.services.strategies.base import BaseStrategy, BetDecision
 class TrioStrategy(BaseStrategy):
     """3連複戦略（予測上位N頭の組み合わせで3連複購入）"""
     
-    def __init__(self, bet_amount: int = 100, top_n: int = 3, min_odds: float = 1.0, max_odds: float = 10000.0):
+    def __init__(self, bet_amount: int = 100, top_n: int = 3, min_odds: float = 1.0, max_odds: float = 10000.0, score_threshold: float = 0.0):
         """
         Args:
             bet_amount: 1レースあたりの購入金額
             top_n: 購入対象とする上位N頭（組み合わせ数: C(N,3)）
             min_odds: 最小オッズ（これ以下は購入しない）
             max_odds: 最大オッズ（これ以上は購入しない）
+            score_threshold: 予測スコア閾値（これ以下は購入しない）
         """
         super().__init__(StrategyType.TRIO, bet_amount)
         self.top_n = max(3, top_n)  # 最低3頭
         self.min_odds = min_odds
         self.max_odds = max_odds
+        self.score_threshold = score_threshold
     
     def should_bet(self, race_data: pd.DataFrame) -> bool:
         """購入すべきかを判定
@@ -82,6 +84,18 @@ class TrioStrategy(BaseStrategy):
         # 全ての3頭組み合わせで3連複を購入
         from itertools import combinations
         for horse1, horse2, horse3 in combinations(top_horses, 3):
+            # 予測スコアチェック
+            if '予測スコア' in race_data.columns:
+                pred_score1 = horse1['予測スコア']
+                pred_score2 = horse2['予測スコア']
+                pred_score3 = horse3['予測スコア']
+                if pd.notna(pred_score1) and pred_score1 < self.score_threshold:
+                    continue
+                if pd.notna(pred_score2) and pred_score2 < self.score_threshold:
+                    continue
+                if pd.notna(pred_score3) and pred_score3 < self.score_threshold:
+                    continue
+            
             win_odds_1 = horse1['単勝オッズ']
             win_odds_2 = horse2['単勝オッズ']
             win_odds_3 = horse3['単勝オッズ']
