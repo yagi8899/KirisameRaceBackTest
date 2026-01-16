@@ -6,7 +6,7 @@ interface HitRateChartProps {
   details: any[];
 }
 
-type ViewMode = 'venue' | 'distance' | 'surface' | 'year';
+type ViewMode = 'venue' | 'distance' | 'surface' | 'year' | 'month';
 
 export function HitRateChart({ details }: HitRateChartProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('venue');
@@ -104,6 +104,32 @@ export function HitRateChart({ details }: HitRateChartProps) {
       .sort((a, b) => parseInt(a.name) - parseInt(b.name));
   };
 
+  // 月別的中率
+  const getMonthData = () => {
+    const monthStats: Record<string, { total: number; hits: number }> = {};
+    
+    details.forEach((detail) => {
+      const day = String(detail.開催日).padStart(3, '0');
+      const month = parseInt(day.substring(0, day.length - 2));
+      const monthKey = `${month}月`;
+      
+      if (!monthStats[monthKey]) {
+        monthStats[monthKey] = { total: 0, hits: 0 };
+      }
+      monthStats[monthKey].total++;
+      if (detail.的中) monthStats[monthKey].hits++;
+    });
+
+    return Object.entries(monthStats)
+      .map(([month, stats]) => ({
+        name: month,
+        hitRate: (stats.hits / stats.total) * 100,
+        hits: stats.hits,
+        total: stats.total,
+      }))
+      .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  };
+
   const getData = () => {
     switch (viewMode) {
       case 'venue':
@@ -114,6 +140,8 @@ export function HitRateChart({ details }: HitRateChartProps) {
         return getSurfaceData();
       case 'year':
         return getYearData();
+      case 'month':
+        return getMonthData();
       default:
         return [];
     }
@@ -170,6 +198,16 @@ export function HitRateChart({ details }: HitRateChartProps) {
             }`}
           >
             年度別
+          </button>
+          <button
+            onClick={() => setViewMode('month')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+              viewMode === 'month'
+                ? 'bg-orange-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            月別
           </button>
         </div>
       </div>

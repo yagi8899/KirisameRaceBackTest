@@ -70,7 +70,8 @@ export default function ResultsTable({ details }: ResultsTableProps) {
         if (typeof aVal === 'number' && typeof bVal === 'number') {
           comparison = aVal - bVal;
         } else if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
-          comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
+          // booleanの場合: true(的中)を前に、false(不的中)を後に
+          comparison = aVal === bVal ? 0 : (aVal ? -1 : 1);
         } else {
           comparison = String(aVal).localeCompare(String(bVal));
         }

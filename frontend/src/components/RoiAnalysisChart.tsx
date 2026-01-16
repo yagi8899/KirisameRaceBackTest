@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 
 interface RoiAnalysisChartProps {
   details: any[];
 }
 
-type ViewMode = 'venue' | 'distance' | 'surface' | 'year' | 'odds';
+type ViewMode = 'venue' | 'distance' | 'surface' | 'year' | 'month' | 'odds';
 
 export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('venue');
@@ -114,14 +114,42 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
       .sort((a, b) => parseInt(a.name) - parseInt(b.name));
   };
 
+  // 月別ROI
+  const getMonthData = () => {
+    const monthStats: Record<string, { investment: number; payout: number; bets: number }> = {};
+    
+    details.forEach((detail) => {
+      const day = String(detail.開催日).padStart(3, '0');
+      const month = parseInt(day.substring(0, day.length - 2));
+      const monthKey = `${month}月`;
+      
+      if (!monthStats[monthKey]) {
+        monthStats[monthKey] = { investment: 0, payout: 0, bets: 0 };
+      }
+      monthStats[monthKey].investment += detail.購入金額;
+      monthStats[monthKey].payout += detail.払戻金額;
+      monthStats[monthKey].bets++;
+    });
+
+    return Object.entries(monthStats)
+      .map(([month, stats]) => ({
+        name: month,
+        roi: stats.investment > 0 ? (stats.payout / stats.investment) * 100 : 0,
+        investment: stats.investment,
+        payout: stats.payout,
+        bets: stats.bets,
+      }))
+      .sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  };
+
   // オッズ帯別ROI（重要）
   const getOddsData = () => {
     const oddsRanges = [
       { label: '1.0-2.0倍', min: 1.0, max: 2.0 },
-      { label: '2.1-4.0倍', min: 2.0, max: 4.0 },
-      { label: '4.1-8.0倍', min: 4.0, max: 8.0 },
-      { label: '8.1-15.0倍', min: 8.0, max: 15.0 },
-      { label: '15.1倍以上', min: 15.0, max: Infinity },
+      { label: '2.0-4.0倍', min: 2.0, max: 4.0 },
+      { label: '4.0-8.0倍', min: 4.0, max: 8.0 },
+      { label: '8.0-15.0倍', min: 8.0, max: 15.0 },
+      { label: '15.0倍以上', min: 15.0, max: Infinity },
     ];
 
     const oddsStats: Record<string, { investment: number; payout: number; bets: number }> = {};
@@ -135,7 +163,7 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
       if (!odds) return;
 
       for (const range of oddsRanges) {
-        if (odds >= range.min && odds < range.max) {
+        if (odds >= range.min && (range.max === Infinity || odds < range.max)) {
           oddsStats[range.label].investment += detail.購入金額;
           oddsStats[range.label].payout += detail.払戻金額;
           oddsStats[range.label].bets++;
@@ -166,6 +194,8 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
         return getSurfaceData();
       case 'year':
         return getYearData();
+      case 'month':
+        return getMonthData();
       case 'odds':
         return getOddsData();
       default:
@@ -231,6 +261,16 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
           年度別
         </button>
         <button
+          onClick={() => setViewMode('month')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+            viewMode === 'month'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          月別
+        </button>
+        <button
           onClick={() => setViewMode('odds')}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
             viewMode === 'odds'
@@ -250,7 +290,8 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
             label={{ value: viewMode === 'venue' ? '競馬場' : 
                           viewMode === 'distance' ? '距離' : 
                           viewMode === 'surface' ? '馬場' : 
-                          viewMode === 'year' ? '年度' : 'オッズ帯', 
+                          viewMode === 'year' ? '年度' : 
+                          viewMode === 'month' ? '月' : 'オッズ帯', 
                     position: 'insideBottom', offset: -5 }}
             stroke="#6b7280"
             angle={viewMode === 'odds' ? -45 : 0}
@@ -262,34 +303,34 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
             stroke="#6b7280"
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '8px 12px',
-            }}
-            formatter={(value: any, name: string, props: any) => {
-              if (name === 'roi') {
-                const data = props.payload;
-                return [
-                  <div key="tooltip" className="space-y-1">
-                    <div className="font-bold">{value.toFixed(1)}%</div>
-                    <div className="text-xs text-gray-600">
-                      投資: ¥{data.investment.toLocaleString()}
+            content={({ active, payload, label }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload;
+                return (
+                  <div 
+                    style={{ backgroundColor: 'white' }}
+                    className="border border-gray-300 rounded-lg p-3 shadow-lg"
+                  >
+                    <p className="font-bold text-gray-900 mb-2">{label}</p>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-blue-600">
+                        ROI: {data.roi.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        投資: ¥{data.investment.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        払戻: ¥{data.payout.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        購入数: {data.bets}回
+                      </p>
                     </div>
-                    <div className="text-xs text-gray-600">
-                      払戻: ¥{data.payout.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      購入数: {data.bets}回
-                    </div>
-                  </div>,
-                  'ROI'
-                ];
+                  </div>
+                );
               }
-              return [value, name];
+              return null;
             }}
-            labelFormatter={(label) => label}
           />
           <Legend />
           {/* 損益分岐点（100%）の基準線 */}
@@ -306,7 +347,7 @@ export function RoiAnalysisChart({ details }: RoiAnalysisChartProps) {
             radius={[8, 8, 0, 0]}
           >
             {chartData.map((entry, index) => (
-              <Bar key={`bar-${index}`} dataKey="roi" fill={getBarColor(entry.roi)} />
+              <Cell key={`cell-${index}`} fill={getBarColor(entry.roi)} />
             ))}
           </Bar>
         </BarChart>

@@ -24,16 +24,25 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
   const [oddsMin, setOddsMin] = useState<number>(1.0);
   const [oddsMax, setOddsMax] = useState<number>(100.0);
 
-  const handleChange = () => {
+  const handleChange = (overrides?: Partial<{
+    racecourses: string[];
+    surfaces: string[];
+    distanceMin: number;
+    distanceMax: number;
+    dateFrom: string;
+    dateTo: string;
+    oddsMin: number;
+    oddsMax: number;
+  }>) => {
     const filters: RaceFilters = {
-      racecourses: selectedRacecourses.length > 0 ? selectedRacecourses : [],
-      surfaces: selectedSurfaces.length > 0 ? selectedSurfaces : [],
-      distanceMin: distanceMin !== 1000 ? distanceMin : null,
-      distanceMax: distanceMax !== 3600 ? distanceMax : null,
-      dateFrom: dateFrom || null,
-      dateTo: dateTo || null,
-      oddsMin: oddsMin !== 1.0 ? oddsMin : null,
-      oddsMax: oddsMax !== 100.0 ? oddsMax : null,
+      racecourses: (overrides?.racecourses ?? selectedRacecourses).length > 0 ? (overrides?.racecourses ?? selectedRacecourses) : [],
+      surfaces: (overrides?.surfaces ?? selectedSurfaces).length > 0 ? (overrides?.surfaces ?? selectedSurfaces) : [],
+      distanceMin: (overrides?.distanceMin ?? distanceMin) !== 1000 ? (overrides?.distanceMin ?? distanceMin) : null,
+      distanceMax: (overrides?.distanceMax ?? distanceMax) !== 3600 ? (overrides?.distanceMax ?? distanceMax) : null,
+      dateFrom: (overrides?.dateFrom ?? dateFrom) || null,
+      dateTo: (overrides?.dateTo ?? dateTo) || null,
+      oddsMin: (overrides?.oddsMin ?? oddsMin) !== 1.0 ? (overrides?.oddsMin ?? oddsMin) : null,
+      oddsMax: (overrides?.oddsMax ?? oddsMax) !== 100.0 ? (overrides?.oddsMax ?? oddsMax) : null,
     };
     onFiltersChange(filters);
   };
@@ -43,7 +52,7 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
       ? selectedRacecourses.filter(r => r !== racecourse)
       : [...selectedRacecourses, racecourse];
     setSelectedRacecourses(newSelection);
-    handleChange();
+    handleChange({ racecourses: newSelection });
   };
 
   const handleSurfaceToggle = (surface: string) => {
@@ -51,31 +60,31 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
       ? selectedSurfaces.filter(s => s !== surface)
       : [...selectedSurfaces, surface];
     setSelectedSurfaces(newSelection);
-    handleChange();
+    handleChange({ surfaces: newSelection });
   };
 
   const handleDistanceMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
     setDistanceMin(value);
-    handleChange();
+    handleChange({ distanceMin: value });
   };
 
   const handleDistanceMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
     setDistanceMax(value);
-    handleChange();
+    handleChange({ distanceMax: value });
   };
 
   const handleOddsMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     setOddsMin(value);
-    handleChange();
+    handleChange({ oddsMin: value });
   };
 
   const handleOddsMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     setOddsMax(value);
-    handleChange();
+    handleChange({ oddsMax: value });
   };
 
   const handleClearFilters = () => {
@@ -236,8 +245,9 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
                   type="date"
                   value={dateFrom}
                   onChange={(e) => {
-                    setDateFrom(e.target.value);
-                    handleChange();
+                    const value = e.target.value;
+                    setDateFrom(value);
+                    handleChange({ dateFrom: value });
                   }}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -248,8 +258,9 @@ export function FilterPanel({ onFiltersChange }: FilterPanelProps) {
                   type="date"
                   value={dateTo}
                   onChange={(e) => {
-                    setDateTo(e.target.value);
-                    handleChange();
+                    const value = e.target.value;
+                    setDateTo(value);
+                    handleChange({ dateTo: value });
                   }}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
